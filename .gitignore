@@ -1,0 +1,51 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.Python
+*.log
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Model artifacts (large binaries — share via release/drive, not git) ---
+models/*.pt
+models/*.onnx
+models/*.engine
+models/*.tflite
+models/*.weights
+*.h5
+
+# --- Datasets (large — share via drive, document link in README) ---
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# --- Logs / DB ---
+*.sqlite3
+*.db
+logs/
+
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# --- Env / secrets ---
+.env
+*.env.local
+config/secrets.yaml
+
+# --- Jetson / build artifacts ---
+*.trt
+*.cache

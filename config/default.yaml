@@ -1,0 +1,33 @@
+# Default configuration for the fire detection pipeline
+# Override by copying to config/local.yaml and passing --config config/local.yaml
+
+model:
+  weights_path: "models/yolov8n_fire.engine"   # TensorRT engine on Jetson; .pt or .onnx for dev-machine testing
+  input_size: 416                              # frame resize (W=H), per proposal
+  confidence_threshold: 0.6                    # tunable, per proposal Phase 5 tuning
+  nms_iou_threshold: 0.45
+  classes:
+    - flame
+    - smoke
+
+camera:
+  source: 0                  # 0 = default webcam for dev; CSI pipeline string for Jetson (nvarguscamerasrc)
+  fps_target: 15              # minimum real-time target per proposal
+  width: 1280
+  height: 720
+
+alarm:
+  buzzer_gpio_pin: 18
+  led_gpio_pin: 23
+  relay_gpio_pin: 24
+  trigger_cooldown_seconds: 10   # avoid alarm spam on sustained detections
+
+logging:
+  db_path: "logs/detections.sqlite3"
+  log_level: "INFO"
+
+mqtt:
+  enabled: false
+  broker_host: "localhost"
+  broker_port: 1883
+  topic: "fire-detection/alerts"
