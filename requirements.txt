@@ -1,6 +1,6 @@
 # Core ML / CV
 ultralytics==8.2.*       # YOLOv8 training & export
-opencv-python==4.5.*     # use opencv-python on dev machine; CUDA-enabled OpenCV ships with JetPack on-device
+opencv-python>=4.6.0,<4.10   # use opencv-python on dev machine; CUDA-enabled OpenCV ships with JetPack on-device
 numpy<2.0
 onnx
 onnxruntime
