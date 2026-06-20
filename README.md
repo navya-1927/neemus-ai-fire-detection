@@ -139,17 +139,17 @@ See [`src/inference/run_inference.py`](src/inference/run_inference.py) for the c
 
 ## Dataset Details
 
-Source: https://github.com/gaia-solutions-on-demand/DFireDataset/tree/master
+Source: https://github.com/gaia-solutions-on-demand/DFireDataset/tree/master <br>
 Number of images:
 - only fire: 1164
 - only smoke: 5867
 - both fire and smoke: 4658
-- nothing: 9838
+- nothing: 9838 <br>
 total: 21527
 
-the train, val and test folders contain two folders: images and labels. labels contains the normalised bounding box coordinates for each image. 0 stands for smoke and 1 stands for fire.
+<p> the train, val and test folders contain two folders: images and labels. labels contains the normalised bounding box coordinates for each image. 0 stands for smoke and 1 stands for fire. </p>
 
-YOLO augments images before training by default.
+<p> YOLO augments images before training by default. </p>
 
 ## Project Roadmap
 
