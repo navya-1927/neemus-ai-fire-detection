@@ -89,10 +89,6 @@ ai-fire-detection/
 │   ├── training/         # Dataset prep, training, evaluation scripts
 │   └── utils/            # Shared helpers (logging, config loading, GPIO control)
 ├── models/               # Trained weights / exported .onnx, .engine files (gitignored)
-├── data/                 # Dataset used: DFire
-│   ├── train/            # Number of images: 15068 (70%)
-│   ├── val/              # Number of images: 2153 (10%)
-│   └── test/             # Number of images: 4306 (20%)
 ├── hardware/
 │   ├── firmware/          # ESP32 / GPIO firmware code (if used)
 │   └── wiring_diagrams/   # Circuit & block diagrams
@@ -129,6 +125,8 @@ source venv/bin/activate        # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+Download and unzip the dataset from HuggingFace: https://huggingface.co/datasets/navya-1927/neemus-ai-fire-detection-dataset
+
 ### Running inference (once a model is trained/placed in `models/`)
 
 ```bash
@@ -145,7 +143,12 @@ Number of images:
 - only smoke: 5867
 - both fire and smoke: 4658
 - nothing: 9838 <br>
-total: 21527
+total: 21527 <br>
+
+train/test/val split:
+- train: 15068 (70%)
+- val: 2153 (10%)
+- test: 4306 (20%) <br>
 
 <p> the train, val and test folders contain two folders: images and labels. labels contains the normalised bounding box coordinates for each image. 0 stands for smoke and 1 stands for fire. </p>
 
