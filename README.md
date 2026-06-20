@@ -88,10 +88,11 @@ ai-fire-detection/
 │   ├── inference/        # Real-time inference pipeline (camera → model → alarm)
 │   ├── training/         # Dataset prep, training, evaluation scripts
 │   └── utils/            # Shared helpers (logging, config loading, GPIO control)
-├── models/                # Trained weights / exported .onnx, .engine files (gitignored)
-├── data/
-│   ├── raw/               # Raw collected images (gitignored)
-│   └── processed/         # Augmented / split train-val-test data (gitignored)
+├── models/               # Trained weights / exported .onnx, .engine files (gitignored)
+├── data/                 # Dataset used: DFire
+│   ├── train/            # Number of images: 15068 (70%)
+│   ├── val/              # Number of images: 2153 (10%)
+│   └── test/             # Number of images: 4306 (20%)
 ├── hardware/
 │   ├── firmware/          # ESP32 / GPIO firmware code (if used)
 │   └── wiring_diagrams/   # Circuit & block diagrams
@@ -135,6 +136,20 @@ python src/inference/run_inference.py --config config/default.yaml
 ```
 
 See [`src/inference/run_inference.py`](src/inference/run_inference.py) for the current stub — this will be filled in as Phase 3 (Embedded Deployment) progresses.
+
+## Dataset Details
+
+Source: https://github.com/gaia-solutions-on-demand/DFireDataset/tree/master
+Number of images:
+- only fire: 1164
+- only smoke: 5867
+- both fire and smoke: 4658
+- nothing: 9838
+total: 21527
+
+the train, val and test folders contain two folders: images and labels. labels contains the normalised bounding box coordinates for each image. 0 stands for smoke and 1 stands for fire.
+
+YOLO augments images before training by default.
 
 ## Project Roadmap
 
