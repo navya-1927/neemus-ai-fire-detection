@@ -8,7 +8,7 @@ model:
   nms_iou_threshold: 0.45
   classes:
     - smoke
-    - flame
+    - fire
 
 camera:
   source: 0                  # 0 = default webcam for dev; CSI pipeline string for Jetson (nvarguscamerasrc)
