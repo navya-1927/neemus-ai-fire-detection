@@ -7,8 +7,8 @@ model:
   confidence_threshold: 0.6                    # tunable, per proposal Phase 5 tuning
   nms_iou_threshold: 0.45
   classes:
-    - flame
     - smoke
+    - flame
 
 camera:
   source: 0                  # 0 = default webcam for dev; CSI pipeline string for Jetson (nvarguscamerasrc)
