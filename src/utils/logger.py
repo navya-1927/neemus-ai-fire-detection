@@ -41,7 +41,7 @@ class DetectionLogger:
         """Insert a single detection event.
 
         Args:
-            class_label: "flame" or "smoke"
+            class_label: "smoke" or "fire"
             confidence: model confidence score (0-1)
             bbox: (x1, y1, x2, y2) bounding box coordinates
             alarm_triggered: whether this detection fired the alarm
