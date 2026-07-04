@@ -19,7 +19,7 @@ def train(data_yaml: str, epochs: int, base_model: str):
 
     Args:
         data_yaml: path to a YOLO-format dataset YAML (train/val/test splits,
-                    class names: flame, smoke)
+                    class names: smoke, fire)
         epochs: number of training epochs
         base_model: pretrained checkpoint to start from (e.g. 'yolov8n.pt')
     """
