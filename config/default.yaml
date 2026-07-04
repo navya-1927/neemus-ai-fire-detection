@@ -5,8 +5,8 @@
 detection:
   confidence_threshold: 0.6      # matches proposal: "Confidence threshold: 0.6 (tunable)"
   classes:
-    0: smoke
-    1: fire
+    - smoke
+    - fire
   # Debounce: require N consecutive detecting frames before raising an alert,
   # to avoid a single noisy frame triggering a false alarm.
   debounce_frames: 3
