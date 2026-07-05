@@ -23,15 +23,10 @@ import cv2
 
 
 def load_model(weights_path: str):
-    """Load the detection model (TensorRT engine, ONNX, or .pt depending on stage).
+    """Load the trained YOLO model (.pt for dev machine)."""
+    from ultralytics import YOLO
+    return YOLO(weights_path)
 
-    TODO: implement once model export is ready (Phase 3 — Embedded Deployment).
-    For TensorRT: load .engine via pycuda/tensorrt runtime.
-    For dev-machine testing: can load a .pt via ultralytics YOLO() as a stand-in.
-    """
-    raise NotImplementedError(
-        f"Model loading not yet implemented. Expected weights at: {weights_path}"
-    )
 
 
 def preprocess_frame(frame, input_size: int):
@@ -47,6 +42,7 @@ def run(config_path: str):
 
     cam_cfg = config["camera"]
     model_cfg = config["model"]
+    det_cfg = config["detection"]
     alarm_cfg = config["alarm"]
 
     logger = DetectionLogger(config["logging"]["db_path"])
@@ -54,16 +50,15 @@ def run(config_path: str):
         buzzer_pin=alarm_cfg["buzzer_gpio_pin"],
         led_pin=alarm_cfg["led_gpio_pin"],
         relay_pin=alarm_cfg["relay_gpio_pin"],
-        cooldown_seconds=alarm_cfg["trigger_cooldown_seconds"],
+        cooldown_seconds=det_cfg["alert_cooldown_seconds"],    
     )
-
+    
     cap = cv2.VideoCapture(cam_cfg["source"])
     if not cap.isOpened():
         raise RuntimeError(f"Could not open camera source: {cam_cfg['source']}")
+    model = load_model(model_cfg["weights_path"])
 
     print("Starting inference loop. Press Ctrl+C to stop.")
-    print("NOTE: model loading is not yet implemented — this loop currently "
-          "just exercises capture + preprocessing for pipeline testing.")
 
     try:
         while True:
@@ -72,8 +67,27 @@ def run(config_path: str):
                 print("Frame capture failed, stopping.")
                 break
 
-            _ = preprocess_frame(frame, model_cfg["input_size"])
+            results = model(
+                frame,
+                imgsz=model_cfg["input_size"],
+                conf=det_cfg["confidence_threshold"],
+                verbose=False,
+            )
 
+            for box in results[0].boxes:
+                label = det_cfg["classes"][int(box.cls)]   # decoder ring at work 💍
+                confidence = float(box.conf)
+                triggered = alarm.trigger()
+                logger.log_detection(
+                    label, confidence,
+                    tuple(box.xyxy[0].tolist()),
+                    alarm_triggered=triggered,
+                )
+
+            annotated = results[0].plot()
+            cv2.imshow("NEEMUS Fire Detection (press q to quit)", annotated)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
             # TODO once model is ready:
             # detections = model_infer(model, processed_frame)
             # for det in detections:

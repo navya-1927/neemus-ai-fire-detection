@@ -1,7 +1,9 @@
 # Neemus Fire Detection — system config
 # Owned by: Saarang Agarwal (System Software, Monitoring & Data Management)
 # Do not hardcode these values in scripts — read from here.
-
+model:
+  weights_path: "models/best.pt"   # dev-machine testing; switch to .engine on Jetson
+  input_size: 416
 detection:
   confidence_threshold: 0.6      # matches proposal: "Confidence threshold: 0.6 (tunable)"
   classes:
@@ -24,6 +26,12 @@ dashboard:
   refresh_seconds: 5
 
 camera:
+  source: 0
   frame_width: 416
   frame_height: 416
   target_fps: 15
+
+alarm:
+  buzzer_gpio_pin: 18
+  led_gpio_pin: 23
+  relay_gpio_pin: 24
