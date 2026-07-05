@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2]))  # repo root
 
 from src.utils.config import load_config
-from src.utils.logger import DetectionLogger
+from src.utils.db_logger import DBLogger
 from src.utils.alarm import AlarmController
 
 import cv2
@@ -45,7 +45,7 @@ def run(config_path: str):
     det_cfg = config["detection"]
     alarm_cfg = config["alarm"]
 
-    logger = DetectionLogger(config["logging"]["db_path"])
+    logger = DBLogger(config["logging"]["db_path"])
     alarm = AlarmController(
         buzzer_pin=alarm_cfg["buzzer_gpio_pin"],
         led_pin=alarm_cfg["led_gpio_pin"],
@@ -80,8 +80,8 @@ def run(config_path: str):
                 triggered = alarm.trigger()
                 logger.log_detection(
                     label, confidence,
-                    tuple(box.xyxy[0].tolist()),
-                    alarm_triggered=triggered,
+                    bbox=tuple(box.xyxy[0].tolist()),
+                    alert_triggered=triggered,
                 )
 
             annotated = results[0].plot()
