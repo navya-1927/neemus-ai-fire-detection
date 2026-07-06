@@ -19,7 +19,7 @@ from src.utils.config import load_config
 from src.utils.db_logger import DBLogger
 from src.utils.alarm import AlarmController
 from src.utils.alert_manager import AlertManager
-
+from src.utils.telemetry import TelemetryReporter
 import cv2
 
 
@@ -65,7 +65,7 @@ def run(config_path: str):
     if not cap.isOpened():
         raise RuntimeError(f"Could not open camera source: {cam_cfg['source']}")
     model = load_model(model_cfg["weights_path"])
-
+    telemetry = TelemetryReporter()
     print("Starting inference loop. Press Ctrl+C to stop.")
 
     try:
@@ -95,6 +95,7 @@ def run(config_path: str):
             cv2.imshow("NEEMUS Fire Detection (press q to quit)", annotated)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
+            telemetry.tick()
             # TODO once model is ready:
             # detections = model_infer(model, processed_frame)
             # for det in detections:

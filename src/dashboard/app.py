@@ -11,6 +11,10 @@ LAN; do NOT expose this port to the open internet as-is.
 """
 
 import argparse
+import json
+import os
+import time
+
 from flask import Flask, jsonify, render_template_string
 
 from src.utils.config_loader import load_config
@@ -36,6 +40,10 @@ TEMPLATE = """
 <body>
   <h1>🔥 Fire Detection Monitor</h1>
   <div class="stats">
+  <div class="stat-box"><b>Detector</b><br>
+      <span style="color: {{ '#4caf50' if telemetry.status == 'ONLINE' else '#ff5533' }}">
+        {{ telemetry.status }}</span></div>
+    <div class="stat-box"><b>FPS</b><br>{{ telemetry.fps if telemetry.fps else '—' }}</div>
     <div class="stat-box"><b>Total detections</b><br>{{ stats.total_detections }}</div>
     <div class="stat-box"><b>Total alerts</b><br>{{ stats.total_alerts }}</div>
     <div class="stat-box"><b>By class</b><br>{{ stats.by_class }}</div>
@@ -62,7 +70,16 @@ def create_app(config_path: str = "config/default.yaml") -> Flask:
     refresh = cfg["dashboard"].get("refresh_seconds", 5)
 
     app = Flask(__name__)
-
+    def read_telemetry():
+        path = "data/telemetry.json"
+        try:
+            with open(path) as f:
+                t = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {"status": "OFFLINE", "fps": None}
+        age = time.time() - t.get("timestamp", 0)
+        t["status"] = "ONLINE" if age < 5 else "OFFLINE"
+        return t
     @app.route("/")
     def index():
         return render_template_string(
@@ -70,6 +87,7 @@ def create_app(config_path: str = "config/default.yaml") -> Flask:
             stats=db.get_stats(),
             events=db.get_recent_events(50),
             refresh=refresh,
+            telemetry=read_telemetry(),
         )
 
     @app.route("/api/stats")
@@ -83,7 +101,9 @@ def create_app(config_path: str = "config/default.yaml") -> Flask:
     @app.route("/api/alerts")
     def api_alerts():
         return jsonify(db.get_recent_alerts(50))
-
+    @app.route("/api/telemetry")
+    def api_telemetry():
+        return jsonify(read_telemetry())
     return app
 
 
