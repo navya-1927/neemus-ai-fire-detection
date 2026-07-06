@@ -70,4 +70,9 @@ class TelemetryReporter:
         tmp = self.out_path + ".tmp"
         with open(tmp, "w") as f:
             json.dump(data, f)
-        os.replace(tmp, self.out_path)   # atomic swap — reader never sees a half-written file
+        try:
+            os.replace(tmp, self.out_path)      # atomic swap
+        except PermissionError:
+            # Windows: reader has the file open this instant — drop this
+            # frame, the next one lands in ~100ms. Never crash the detector.
+            pass

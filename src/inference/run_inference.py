@@ -20,6 +20,7 @@ from src.utils.db_logger import DBLogger
 from src.utils.alarm import AlarmController
 from src.utils.alert_manager import AlertManager
 from src.utils.telemetry import TelemetryReporter
+from src.utils.frame_publisher import FramePublisher
 import cv2
 
 
@@ -66,6 +67,7 @@ def run(config_path: str):
         raise RuntimeError(f"Could not open camera source: {cam_cfg['source']}")
     model = load_model(model_cfg["weights_path"])
     telemetry = TelemetryReporter()
+    publisher = FramePublisher(config["dashboard"]["live_frame_path"])
     print("Starting inference loop. Press Ctrl+C to stop.")
 
     try:
@@ -92,6 +94,7 @@ def run(config_path: str):
             ]
             alert_mgr.process_frame(detections)
             annotated = results[0].plot()
+            publisher.publish(annotated)
             cv2.imshow("NEEMUS Fire Detection (press q to quit)", annotated)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break

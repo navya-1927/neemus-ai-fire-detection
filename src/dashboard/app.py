@@ -15,8 +15,7 @@ import json
 import os
 import time
 
-from flask import Flask, jsonify, render_template_string
-
+from flask import Flask, jsonify, render_template_string, Response
 from src.utils.config_loader import load_config
 from src.utils.db_logger import DBLogger
 
@@ -48,7 +47,8 @@ TEMPLATE = """
     <div class="stat-box"><b>Total alerts</b><br>{{ stats.total_alerts }}</div>
     <div class="stat-box"><b>By class</b><br>{{ stats.by_class }}</div>
   </div>
-
+<h2>Live feed</h2>
+  <img src="/video_feed" width="640" style="border:1px solid #333; border-radius:6px;">
   <h2>Recent events</h2>
   <table>
     <tr><th>ID</th><th>Time (UTC)</th><th>Class</th><th>Confidence</th><th>Alert?</th></tr>
@@ -104,7 +104,26 @@ def create_app(config_path: str = "config/default.yaml") -> Flask:
     @app.route("/api/telemetry")
     def api_telemetry():
         return jsonify(read_telemetry())
-    return app
+
+    @app.route("/video_feed")
+    def video_feed():
+        frame_path = cfg["dashboard"]["live_frame_path"]
+
+        def generate():
+            while True:
+                try:
+                    with open(frame_path, "rb") as f:
+                        jpg = f.read()
+                    yield (b"--frame\r\n"
+                           b"Content-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n")
+                except (FileNotFoundError, PermissionError):
+                    pass
+                time.sleep(0.1)
+
+        return Response(generate(),
+                        mimetype="multipart/x-mixed-replace; boundary=frame")
+
+    return app        # ← exit door: nothing below this ever runs
 
 
 if __name__ == "__main__":
