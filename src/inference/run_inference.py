@@ -18,6 +18,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))  # repo root
 from src.utils.config import load_config
 from src.utils.db_logger import DBLogger
 from src.utils.alarm import AlarmController
+from src.utils.alert_manager import AlertManager
 
 import cv2
 
@@ -50,9 +51,16 @@ def run(config_path: str):
         buzzer_pin=alarm_cfg["buzzer_gpio_pin"],
         led_pin=alarm_cfg["led_gpio_pin"],
         relay_pin=alarm_cfg["relay_gpio_pin"],
-        cooldown_seconds=det_cfg["alert_cooldown_seconds"],    
+        cooldown_seconds=0,    
     )
-    
+    alert_mgr = AlertManager(
+        db_logger=logger,
+        confidence_threshold=det_cfg["confidence_threshold"],
+        debounce_frames=det_cfg["debounce_frames"],
+        alert_cooldown_seconds=det_cfg["alert_cooldown_seconds"],
+        on_alert=lambda top: alarm.trigger(),
+    )    
+
     cap = cv2.VideoCapture(cam_cfg["source"])
     if not cap.isOpened():
         raise RuntimeError(f"Could not open camera source: {cam_cfg['source']}")
@@ -74,16 +82,15 @@ def run(config_path: str):
                 verbose=False,
             )
 
-            for box in results[0].boxes:
-                label = det_cfg["classes"][int(box.cls)]   # decoder ring at work 💍
-                confidence = float(box.conf)
-                triggered = alarm.trigger()
-                logger.log_detection(
-                    label, confidence,
-                    bbox=tuple(box.xyxy[0].tolist()),
-                    alert_triggered=triggered,
-                )
-
+            detections = [
+                {
+                    "class_name": det_cfg["classes"][int(box.cls)],
+                    "confidence": float(box.conf),
+                    "bbox": box.xyxy[0].tolist(),
+                }
+                for box in results[0].boxes
+            ]
+            alert_mgr.process_frame(detections)
             annotated = results[0].plot()
             cv2.imshow("NEEMUS Fire Detection (press q to quit)", annotated)
             if cv2.waitKey(1) & 0xFF == ord("q"):
