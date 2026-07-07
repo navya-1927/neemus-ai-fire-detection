@@ -14,8 +14,7 @@ import argparse
 import json
 import os
 import time
-
-from flask import Flask, jsonify, render_template_string, Response
+from flask import Flask, jsonify, render_template_string, render_template, Response
 from src.utils.config_loader import load_config
 from src.utils.db_logger import DBLogger
 
@@ -70,6 +69,7 @@ def create_app(config_path: str = "config/default.yaml") -> Flask:
     refresh = cfg["dashboard"].get("refresh_seconds", 5)
 
     app = Flask(__name__)
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0   # dev mode: never cache static files
     def read_telemetry():
         path = "data/telemetry.json"
         try:
@@ -82,6 +82,10 @@ def create_app(config_path: str = "config/default.yaml") -> Flask:
         return t
     @app.route("/")
     def index():
+        return app.send_static_file("dashboard.html")
+    @app.route("/classic")
+    def classic():
+        # the original server-rendered dashboard, kept as a fallback
         return render_template_string(
             TEMPLATE,
             stats=db.get_stats(),
@@ -89,7 +93,6 @@ def create_app(config_path: str = "config/default.yaml") -> Flask:
             refresh=refresh,
             telemetry=read_telemetry(),
         )
-
     @app.route("/api/stats")
     def api_stats():
         return jsonify(db.get_stats())
