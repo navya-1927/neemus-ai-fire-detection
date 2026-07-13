@@ -48,6 +48,7 @@ class AlertManager:
 
         self._recent_hits = deque(maxlen=debounce_frames)
         self._last_alert_time: float = 0.0
+        self._last_discard_log: float = 0.0
 
     def process_frame(self, detections: Optional[List[Dict[str, Any]]]):
         """
@@ -56,12 +57,27 @@ class AlertManager:
         was triggered this frame, else False.
         """
         detections = detections or []
-        # Keep only detections above threshold and of a known class
-        valid = [
-            d for d in detections
-            if d.get("confidence", 0) >= self.confidence_threshold
-            and d.get("class_name") in ("fire", "smoke")
-        ]
+        now = time.time()
+
+        # Sort each detection: keep it, or reject it WITH a recorded reason
+        valid, rejected = [], []
+        for d in detections:
+            cls = d.get("class_name")
+            conf = d.get("confidence", 0)
+            if cls not in ("fire", "smoke"):
+                rejected.append((d, "invalid class id"))
+            elif conf < self.confidence_threshold:
+                rejected.append((d, f"confidence < {self.confidence_threshold}"))
+            else:
+                valid.append(d)
+
+        # Discard logging is SAMPLED (max ~1 row/sec): a smoky-looking shadow
+        # at 15 FPS would otherwise write 15 identical rows a second and
+        # grind the Jetson's SD card. We keep evidence, not every echo.
+        if rejected and (now - self._last_discard_log) >= 1.0:
+            d, reason = rejected[0]
+            self.db_logger.log_discard(d.get("class_name"), d.get("confidence"), reason)
+            self._last_discard_log = now
 
         # Log every raw detection regardless of alert outcome (alert flag
         # gets filled in after the debounce check below)

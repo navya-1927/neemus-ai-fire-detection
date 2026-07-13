@@ -107,7 +107,9 @@ def create_app(config_path: str = "config/default.yaml") -> Flask:
     @app.route("/api/telemetry")
     def api_telemetry():
         return jsonify(read_telemetry())
-
+    @app.route("/api/discards")
+    def api_discards():
+        return jsonify(db.get_recent_discards(50))
     @app.route("/video_feed")
     def video_feed():
         frame_path = cfg["dashboard"]["live_frame_path"]

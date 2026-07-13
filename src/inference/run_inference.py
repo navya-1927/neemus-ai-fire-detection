@@ -21,6 +21,7 @@ from src.utils.alarm import AlarmController
 from src.utils.alert_manager import AlertManager
 from src.utils.telemetry import TelemetryReporter
 from src.utils.frame_publisher import FramePublisher
+from src.utils.hardware_alarm import make_alarm
 import cv2
 
 
@@ -80,7 +81,7 @@ def run(config_path: str):
             results = model(
                 frame,
                 imgsz=model_cfg["input_size"],
-                conf=det_cfg["confidence_threshold"],
+                conf=det_cfg.get("model_conf_floor", 0.25),
                 verbose=False,
             )
 

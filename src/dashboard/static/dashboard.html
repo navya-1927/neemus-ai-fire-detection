@@ -60,6 +60,10 @@ function usePoll(url, intervalMs) {
 
 const useTelemetry = () => usePoll("/api/telemetry", 2000);
 const useEvents = () => usePoll("/api/events", 3000);
+const useDiscards = () => {
+  const d = usePoll("/api/discards", 5000);
+  return Array.isArray(d) ? d : [];
+};
 const useStats = () => usePoll("/api/stats", 5000);
 
 /* helpers to survive whatever shape a row has */
@@ -303,6 +307,7 @@ const ConfidenceGauge = ({ pct }) => {
 };
 
 function ScreenTimeline() {
+  const discards = useDiscards();
   const events = useEvents() || [];
   const alerts = events.filter((e) => e.alert_triggered);
   const selected = alerts[0] || events[0] || null;
@@ -343,12 +348,12 @@ function ScreenTimeline() {
                 </tr>
               </thead>
               <tbody>
-                {discardRows.map((r, i) => (
+                {discards.map((r, i) => (
                   <tr key={i} className="border-b border-slate-700/50">
-                    <td className="py-3 pr-4 text-slate-300 font-mono text-xs">{r.ts}</td>
-                    <td className="py-3 pr-4 text-slate-300 font-mono text-xs">{r.fid}</td>
-                    <td className="py-3 pr-4 text-white font-mono">{r.conf}</td>
-                    <td className="py-3 pr-4 text-slate-300">{r.cls}</td>
+                    <td className="py-3 pr-4 text-slate-300 font-mono text-xs">{fmtTime(r.timestamp)}</td>
+                    <td className="py-3 pr-4 text-slate-300 font-mono text-xs">#{r.id}</td>
+                    <td className="py-3 pr-4 text-white font-mono">{r.confidence != null ? Number(r.confidence).toFixed(2) : "N/A"}</td>
+                    <td className="py-3 pr-4 text-slate-300">{r.class_name || "Unknown"}</td>
                     <td className="py-3 text-slate-400">{r.reason}</td>
                   </tr>))}
               </tbody>

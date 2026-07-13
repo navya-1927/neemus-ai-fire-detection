@@ -42,6 +42,14 @@ CREATE TABLE IF NOT EXISTS detections (
 );
 CREATE INDEX IF NOT EXISTS idx_detections_timestamp ON detections(timestamp);
 CREATE INDEX IF NOT EXISTS idx_detections_alert ON detections(alert_triggered);
+CREATE TABLE IF NOT EXISTS discards (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp   TEXT NOT NULL,
+    class_name  TEXT,
+    confidence  REAL,
+    reason      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_discards_timestamp ON discards(timestamp);
 """
 
 
@@ -91,6 +99,22 @@ class DBLogger:
             )
             return cur.lastrowid
 
+    def log_discard(self, class_name, confidence, reason: str):
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT INTO discards (timestamp, class_name, confidence, reason)"
+                " VALUES (?, ?, ?, ?)",
+                (datetime.now(timezone.utc).isoformat(),
+                 class_name, confidence, reason),
+            )
+
+    def get_recent_discards(self, limit: int = 50):
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM discards ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+    
     def get_recent_events(self, limit: int = 50):
         with self._connect() as conn:
             rows = conn.execute(

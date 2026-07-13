@@ -15,7 +15,7 @@ detection:
   # How long (seconds) to suppress repeat alerts after one fires, so the
   # buzzer/relay doesn't re-trigger every frame while fire is still in view.
   alert_cooldown_seconds: 30
-
+  model_conf_floor: 0.25   # model-level noise floor; real judging happens in AlertManager
 logging:
   db_path: "data/detections.db"
   log_level: "INFO"
@@ -33,6 +33,7 @@ camera:
   target_fps: 15
 
 alarm:
+  mode: "simulated"        # "simulated" on laptops, "gpio" on the Jetson
   buzzer_gpio_pin: 18
   led_gpio_pin: 23
   relay_gpio_pin: 24
