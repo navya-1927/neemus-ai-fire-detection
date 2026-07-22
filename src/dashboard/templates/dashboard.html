@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NEEMUS AI Fire Detection Suite</title>
+<!-- Data source note: Screens 1 (detection log), 3 (timeline) and 5 (event database)
+     are wired to live data from /api/events and /api/logs (src/utils/db_logger.py).
+     Screens 2 (GPU telemetry) and 4 (buzzer/relay hardware state) are still
+     simulated pending endpoints from Mihir's inference module and Dev's GPIO
+     module — see the DATA_SOURCE_PENDING markers below. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root{
+    --bg:#0a0e1a;
+    --panel:#101627;
+    --panel-2:#151d33;
+    --border:#232c47;
+    --border-soft:#1b2338;
+    --text:#e8ecf7;
+    --text-dim:#8892b0;
+    --text-faint:#5a6485;
+    --accent:#3ecbe0;
+    --accent-dim:#1e5866;
+    --accent-glow:rgba(62,203,224,0.15);
+    --red:#ef4a5f;
+    --red-dim:#3a1620;
+    --amber:#f0a63a;
+    --amber-dim:#3a2a10;
+    --green:#3ecb7a;
+    --green-dim:#123322;
+    --mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
+    --sans: -apple-system, 'Inter', 'Segoe UI', sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---- Top bar ---- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 28px;
+    border-bottom:1px solid var(--border-soft);
+    background:var(--panel);
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:34px; height:34px; border-radius:9px;
+    background:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+  }
+  .brand-text h1{font-size:15px; font-weight:700; letter-spacing:0.5px;}
+  .brand-text span{font-size:11.5px; color:var(--text-dim);}
+  .top-right{display:flex; align-items:center; gap:18px;}
+  .clock{font-family:var(--mono); font-size:13px; color:var(--text-dim); letter-spacing:0.5px;}
+  .status-pill{
+    display:flex; align-items:center; gap:7px;
+    font-size:11.5px; font-weight:600; letter-spacing:0.5px;
+    color:var(--green); padding:6px 12px; border-radius:20px;
+    background:var(--green-dim); border:1px solid rgba(62,203,122,0.25);
+  }
+  .status-dot{width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 8px var(--green); animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.4;}}
+
+  /* ---- Nav ---- */
+  .nav{
+    display:flex; gap:8px; padding:14px 28px;
+    border-bottom:1px solid var(--border-soft);
+    overflow-x:auto;
+  }
+  .nav button{
+    background:var(--panel); color:var(--text-dim);
+    border:1px solid var(--border-soft);
+    padding:9px 16px; border-radius:8px;
+    font-size:13px; font-weight:600; cursor:pointer;
+    white-space:nowrap;
+    transition:all .15s ease;
+    font-family:var(--sans);
+  }
+  .nav button:hover{color:var(--text); border-color:var(--border);}
+  .nav button.active{
+    background:var(--accent);
+    color:#04262c; border-color:transparent;
+  }
+
+  main{padding:24px 28px 60px;}
+  .screen{display:none; animation:fadein .25s ease;}
+  .screen.active{display:block;}
+  @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+  .screen-title{font-size:19px; font-weight:700; margin-bottom:4px;}
+  .screen-sub{font-size:12.5px; color:var(--text-dim); margin-bottom:20px; letter-spacing:0.3px;}
+
+  .grid3{display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:18px;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media(max-width:1000px){ .grid3, .grid2{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border-soft);
+    border-radius:12px;
+    padding:18px 20px;
+  }
+  .panel h3{font-size:12.5px; font-weight:700; letter-spacing:0.6px; color:var(--text); text-transform:uppercase; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between;}
+  .panel h3 .tag{font-size:10.5px; font-weight:600; color:var(--text-faint); text-transform:none; letter-spacing:0;}
+
+  /* ---- Screen 1: Live Feed ---- */
+  .video-wrap{position:relative; border-radius:9px; overflow:hidden; background:#000; aspect-ratio:16/10;}
+  .video-wrap svg{width:100%; height:100%; display:block;}
+  .flame-box{
+    position:absolute; border:2px solid var(--accent); border-radius:4px;
+  }
+  .flame-label{
+    position:absolute; background:var(--accent); color:#04262c;
+    font-size:11px; font-weight:700; padding:3px 8px; border-radius:5px;
+    font-family:var(--mono); white-space:nowrap;
+  }
+  .rec-badge{
+    position:absolute; top:10px; right:10px;
+    display:flex; align-items:center; gap:6px;
+    background:rgba(0,0,0,0.55); padding:4px 10px; border-radius:6px;
+    font-size:11px; font-family:var(--mono); color:#ddd;
+  }
+  .rec-dot{width:6px;height:6px;border-radius:50%; background:var(--red); animation:pulse 1.2s infinite;}
+  .feed-bar{margin-top:12px;}
+  .bar-track{height:4px; background:var(--border); border-radius:4px; overflow:hidden;}
+  .bar-fill{height:100%; background:var(--accent); transition:width .3s;}
+  .bar-label{display:flex; justify-content:center; font-size:11px; color:var(--text-faint); margin-top:6px; font-family:var(--mono);}
+
+  .status-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-soft);}
+  .status-row:last-child{border-bottom:none;}
+  .status-row .k{font-size:12px; color:var(--text-dim);}
+  .status-row .v{display:flex; align-items:center; gap:7px; font-size:13px; font-weight:600;}
+  .dot{width:7px; height:7px; border-radius:50%;}
+  .dot.g{background:var(--green);}
+  .dot.a{background:var(--accent);}
+
+  .section-gap{margin-top:18px; padding-top:16px; border-top:1px solid var(--border-soft);}
+  .slider-row{display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim); margin-bottom:8px;}
+  .slider-row b{color:var(--text); font-family:var(--mono);}
+  input[type=range]{width:100%; accent-color:var(--accent); height:4px;}
+  .slider-minmax{display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-faint); margin-top:4px; font-family:var(--mono);}
+  .radio-group{display:flex; flex-direction:column; gap:9px; margin-top:12px;}
+  .radio-opt{display:flex; align-items:center; gap:9px; font-size:13px; cursor:pointer; color:var(--text-dim);}
+  .radio-opt input{accent-color:var(--accent);}
+  .radio-opt.checked{color:var(--text); font-weight:600;}
+
+  .log-item{display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border-soft); font-size:12.5px;}
+  .log-item:last-child{border-bottom:none;}
+  .chip{padding:3px 9px; border-radius:5px; font-size:11px; font-weight:700; font-family:var(--mono);}
+  .chip.flame{background:var(--accent-dim); color:var(--accent);}
+  .chip.smoke{background:#2a3350; color:#a9b4d6;}
+  .chip.normal{background:var(--green-dim); color:var(--green);}
+  .chip.fail{background:var(--red-dim); color:var(--red);}
+  .log-time{color:var(--text-faint); font-family:var(--mono); font-size:11.5px;}
+  .log-pct{font-family:var(--mono); font-weight:700; font-size:12px;}
+
+  /* ---- Screen 2: Telemetry ---- */
+  .gpu-ring-wrap{display:flex; flex-direction:column; align-items:center; padding:10px 0 6px;}
+  .gpu-status-text{font-size:11.5px; color:var(--text-dim); margin-top:10px;}
+  .gpu-status-val{font-size:18px; font-weight:700; color:var(--green); margin-top:2px;}
+  .metric-strip{display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px; background:var(--border-soft); border-radius:9px; overflow:hidden; margin-top:16px;}
+  .metric-cell{background:var(--green-dim); padding:12px 14px;}
+  .metric-cell .lbl{font-size:10px; color:#8fe0b0; letter-spacing:0.5px; text-transform:uppercase;}
+  .metric-cell .val{font-size:19px; font-weight:700; color:var(--text); margin-top:3px; font-family:var(--mono);}
+  .metric-cell .sub{font-size:10px; color:#8fe0b0; margin-top:2px;}
+  .restart-btn{
+    margin-top:14px; width:100%; padding:11px; border-radius:8px; border:1px solid var(--border);
+    background:var(--panel-2); color:var(--amber); font-weight:700; font-size:12.5px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:8px; transition:all .15s;
+  }
+  .restart-btn:hover{background:var(--amber-dim); border-color:var(--amber);}
+  .restart-btn.spinning svg{animation:spin 0.7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .overlay-tag{position:absolute; background:var(--accent-dim); color:var(--accent); font-family:var(--mono); font-size:10.5px; font-weight:700; padding:3px 7px; border-radius:4px; border:1px solid rgba(62,203,224,0.4);}
+
+  /* ---- Screen 3: Timeline ---- */
+  .timeline{position:relative; padding-left:22px;}
+  .timeline::before{content:''; position:absolute; left:5px; top:6px; bottom:6px; width:1.5px; background:var(--border);}
+  .tl-item{position:relative; margin-bottom:10px; cursor:pointer;}
+  .tl-dot{position:absolute; left:-22px; top:14px; width:10px; height:10px; border-radius:50%; background:var(--accent); border:2px solid var(--bg); box-shadow:0 0 8px var(--accent-glow);}
+  .tl-dot.discarded{background:var(--text-faint); box-shadow:none;}
+  .tl-row{display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid var(--border-soft); border-radius:8px; padding:11px 14px; transition:all .15s;}
+  .tl-row:hover{border-color:var(--accent);}
+  .tl-row.selected{border-color:var(--accent); background:rgba(62,203,224,0.08);}
+  .tl-row.discarded{opacity:0.55;}
+  .tl-time{font-family:var(--mono); font-size:11px; color:var(--text-faint); min-width:78px;}
+  .tl-label{font-size:13px; font-weight:700; flex:1;}
+  .tl-label.discard{color:var(--text-dim); font-weight:500;}
+
+  .discard-table{width:100%; border-collapse:collapse; margin-top:6px; font-size:12px;}
+  .discard-table th{text-align:left; padding:8px 6px; color:var(--text-faint); font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border-soft);}
+  .discard-table td{padding:9px 6px; border-bottom:1px solid var(--border-soft); color:var(--text-dim);}
+  .discard-table tr:last-child td{border-bottom:none;}
+
+  .confidence-gauge{display:flex; flex-direction:column; align-items:center; margin:8px 0 4px;}
+  .gauge-pct{font-size:30px; font-weight:800; font-family:var(--mono);}
+  .gauge-sub{font-size:11px; color:var(--text-faint); margin-top:-4px;}
+  .class-tags{display:flex; gap:8px; margin-top:14px; justify-content:center;}
+  .class-tag{padding:6px 14px; border-radius:20px; font-size:12px; font-weight:700; border:1px solid var(--border);}
+  .class-tag.active{background:var(--accent); color:#04262c; border-color:transparent;}
+  .class-tag.inactive{color:var(--text-faint);}
+  .detail-row{display:flex; justify-content:space-between; padding:8px 0; font-size:12px; border-bottom:1px solid var(--border-soft);}
+  .detail-row:last-child{border-bottom:none;}
+  .detail-row .k{color:var(--text-faint);}
+  .detail-row .v{font-weight:600; font-family:var(--mono); font-size:11.5px;}
+
+  /* ---- Screen 4: Alarm Control ---- */
+  .alarm-icon{width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;}
+  .alarm-status-lbl{font-size:11.5px; color:var(--text-dim); font-weight:600; letter-spacing:0.3px;}
+  .alarm-status-sub{font-size:10.5px; color:var(--text-faint);}
+  .big-status{font-size:32px; font-weight:800; margin:8px 0 4px; letter-spacing:0.5px;}
+  .big-status.standby{color:var(--text-dim);}
+  .big-status.active{color:var(--red);}
+  .wave{color:var(--red); font-size:14px; margin-left:6px;}
+  .mini-detail{font-size:11.5px; color:var(--text-faint); margin-top:8px;}
+  .vol-row{display:flex; align-items:center; gap:10px; margin-top:16px;}
+  .toggle-switch{position:relative; width:44px; height:24px; border-radius:20px; background:var(--border); cursor:pointer; transition:background .2s; flex-shrink:0;}
+  .toggle-switch.on{background:var(--accent);}
+  .toggle-switch::after{content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform .2s;}
+  .toggle-switch.on::after{transform:translateX(20px);}
+  .leds{display:flex; gap:4px; margin:14px 0 6px; flex-wrap:wrap;}
+  .led{width:16px; height:8px; border-radius:2px; background:var(--border);}
+  .led.on{background:var(--red); box-shadow:0 0 6px var(--red);}
+  .led.on.alt{background:var(--accent); box-shadow:0 0 6px var(--accent);}
+  .relay-box{margin-top:16px; padding-top:14px; border-top:1px solid var(--border-soft);}
+  .relay-row{display:flex; align-items:center; justify-content:space-between; margin-top:10px;}
+  .relay-state{font-size:14px; font-weight:700; text-align:right;}
+  .warn-box{margin-top:12px; padding:10px 12px; background:var(--red-dim); border:1px solid rgba(239,74,95,0.3); border-radius:8px; font-size:11.5px; color:#ff8a97; display:flex; gap:8px; align-items:flex-start;}
+  .sync-card{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:10px; padding:14px;}
+  .ack-btn{
+    margin-top:16px; width:100%; padding:26px 16px; border-radius:12px; border:none;
+    background:var(--accent); color:#04262c;
+    font-weight:800; font-size:15px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:8px;
+    transition:transform .12s, box-shadow .12s;
+  }
+  .ack-btn:hover{background:#33b6cc;}
+  .ack-btn:active{transform:translateY(0);}
+  .ack-btn.acked{background:var(--panel-2); color:var(--green); border:1px solid var(--green);}
+
+  /* ---- Screen 5: Event Database ---- */
+  .filter-bar{display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:18px;}
+  .field-group{display:flex; flex-direction:column; gap:6px;}
+  .field-group label{font-size:11px; color:var(--text-dim); font-weight:600;}
+  .field-group input, .field-group select{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    padding:9px 12px; border-radius:7px; font-size:12.5px; font-family:var(--sans);
+  }
+  .btn{padding:10px 16px; border-radius:7px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font-size:12.5px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:7px; transition:all .15s;}
+  .btn:hover{border-color:var(--accent); color:var(--accent);}
+  .btn.primary{background:var(--accent); color:#04262c; border:none;}
+  .btn.primary:hover{opacity:0.9; color:#04262c;}
+
+  table.event-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  table.event-table th{text-align:left; padding:11px 12px; color:var(--text-faint); font-size:10.5px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); cursor:pointer; user-select:none;}
+  table.event-table th:hover{color:var(--accent);}
+  table.event-table td{padding:11px 12px; border-bottom:1px solid var(--border-soft); color:var(--text-dim);}
+  table.event-table tr:hover td{background:rgba(62,203,224,0.04);}
+  .type-chip{padding:3px 10px; border-radius:5px; font-size:10.5px; font-weight:700;}
+  .type-chip.Threat{background:var(--red-dim); color:var(--red);}
+  .type-chip.Failure{background:var(--amber-dim); color:var(--amber);}
+  .type-chip.Switch{background:#20264a; color:#8fa0e8;}
+  .type-chip.Normal{background:var(--green-dim); color:var(--green);}
+  .type-chip.Relay{background:#2a2050; color:#c99cf0;}
+  .results-count{font-size:11.5px; color:var(--text-faint); margin-top:12px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">🔥</div>
+    <div class="brand-text">
+      <h1>NEEMUS</h1>
+      <span>AI Fire Detection Suite</span>
+    </div>
+  </div>
+  <div class="top-right">
+    <span class="clock" id="clock">12:00 AM</span>
+    <div class="status-pill"><span class="status-dot"></span>OPERATIONAL</div>
+  </div>
+</div>
+
+<div class="nav" id="nav">
+  <button data-screen="s1" class="active">Screen 1 · Live Feed</button>
+  <button data-screen="s2">Screen 2 · Telemetry</button>
+  <button data-screen="s3">Screen 3 · Timeline</button>
+  <button data-screen="s4">Screen 4 · Alarm Control</button>
+  <button data-screen="s5">Screen 5 · Event Database</button>
+</div>
+
+<main>
+
+<!-- SCREEN 1: LIVE FEED -->
+<section class="screen active" id="s1">
+  <div class="screen-title">Live Video Feed</div>
+  <div class="screen-sub">Real-time flame and smoke detection · IMX219 CSI camera</div>
+  <div class="grid3">
+    <div class="panel">
+      <h3>LIVE VIDEO FEED <span class="tag">16:9</span></h3>
+      <div class="video-wrap" id="videoWrap">
+        <svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">
+          <rect width="400" height="250" fill="#12161f"/>
+          <rect x="0" y="170" width="400" height="80" fill="#181d28"/>
+          <rect x="20" y="70" width="70" height="150" fill="#20262f"/>
+          <rect x="100" y="100" width="55" height="120" fill="#232936"/>
+          <rect x="230" y="60" width="90" height="160" fill="#1c212b"/>
+          <rect x="335" y="90" width="50" height="130" fill="#20262f"/>
+          <circle cx="270" cy="150" r="18" fill="#ff6a1f" opacity="0.85"/>
+          <circle cx="278" cy="140" r="12" fill="#ffb23e" opacity="0.9"/>
+          <circle cx="262" cy="145" r="10" fill="#ff8a2e" opacity="0.8"/>
+        </svg>
+        <div class="flame-box" id="flameBox" style="left:58%; top:38%; width:15%; height:28%;"></div>
+        <div class="flame-label" id="flameLabel" style="left:58%; top:68%;">Flame — 89% Confidence</div>
+        <div class="rec-badge"><span class="rec-dot"></span>LIVE</div>
+      </div>
+      <div class="feed-bar">
+        <div class="bar-track"><div class="bar-fill" style="width:70%;"></div></div>
+        <div class="bar-label">16:9 &nbsp;·&nbsp; 1280×720 &nbsp;·&nbsp; <span id="liveFps">18</span> FPS</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>System Status</h3>
+      <div class="status-row"><span class="k">Power</span><span class="v"><span class="dot a"></span>Connected</span></div>
+      <div class="status-row"><span class="k">Camera Connection</span><span class="v"><span class="dot a"></span>IMX219 CSI</span></div>
+      <div class="status-row"><span class="k">Camera Link</span><span class="v"><span class="dot a"></span>Connected</span></div>
+      <div class="status-row"><span class="k">Inference Engine</span><span class="v"><span class="dot a"></span>YOLOv8-Nano TensorRT</span></div>
+
+      <div class="section-gap">
+        <h3 style="margin-bottom:12px;">Detection Configuration</h3>
+        <div class="slider-row"><span>Confidence Threshold</span><b id="threshVal">0.60</b></div>
+        <input type="range" id="threshSlider" min="0" max="1" step="0.01" value="0.6">
+        <div class="slider-minmax"><span>0.0</span><span>1.0</span></div>
+
+        <div class="radio-group" id="radioGroup">
+          <label class="radio-opt checked"><input type="radio" name="mode" checked> Active</label>
+          <label class="radio-opt"><input type="radio" name="mode"> Standby</label>
+          <label class="radio-opt"><input type="radio" name="mode"> Maintenance</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Detection Log</h3>
+      <div style="font-size:11.5px; color:var(--text-faint); margin-bottom:4px;">Active Sensor</div>
+      <div style="font-size:13.5px; font-weight:600; margin-bottom:14px;">Normal Light — IMX219</div>
+
+      <h3 style="margin-top:6px;">Hardware Health</h3>
+      <div class="status-row"><span class="k">Power</span><span class="v"><span class="dot a"></span>Connected</span></div>
+      <div class="status-row"><span class="k">Camera Connection</span><span class="v"><span class="dot a"></span>Connected</span></div>
+      <div class="status-row"><span class="k">YOLOv8 Engine</span><span class="v"><span class="dot a"></span>Optimal</span></div>
+
+      <div class="section-gap">
+        <h3>Detection Log Stats <span class="tag">Live · updates every 3s</span></h3>
+        <div id="logList">
+          <div class="log-item"><span style="color:var(--text-faint); font-size:12px;">Connecting to detection log…</span></div>
+        </div>
+        <div class="bar-track" style="margin-top:14px;"><div class="bar-fill" style="width:30%;"></div></div>
+        <div class="bar-label">30% buffer used</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 2: TELEMETRY -->
+<section class="screen" id="s2">
+  <div class="screen-title">AI Telemetry &amp; Inference Viewer</div>
+  <div class="screen-sub">Raw inference overlay · pre-NMS bounding boxes · GPU performance metrics</div>
+  <div class="grid2">
+    <div class="panel">
+      <h3>Inference Overlay <span class="tag">Execute AI Inference</span></h3>
+      <div class="video-wrap" style="position:relative;">
+        <svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">
+          <rect width="400" height="250" fill="#12161f"/>
+          <rect x="0" y="170" width="400" height="80" fill="#181d28"/>
+          <rect x="20" y="70" width="70" height="150" fill="#20262f"/>
+          <rect x="230" y="60" width="90" height="160" fill="#1c212b"/>
+          <circle cx="255" cy="155" r="16" fill="#ff6a1f" opacity="0.85"/>
+          <circle cx="262" cy="146" r="10" fill="#ffb23e" opacity="0.9"/>
+        </svg>
+        <div class="overlay-tag" style="left:14px; top:14px;">RAW_DETECTION</div>
+        <div class="overlay-tag" style="left:14px; top:38px;">RAW_DETECTION</div>
+        <div class="overlay-tag" style="left:12px; bottom:14px; right:12px; text-align:center;">UNFILTERED BOUNDING BOX · Raw Output</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>GPU Status Indicator <span class="tag" style="color:var(--amber);">⚠ simulated — pending inference module feed</span></h3>
+      <div class="gpu-ring-wrap">
+        <svg width="90" height="90" viewBox="0 0 90 90">
+          <circle cx="45" cy="45" r="38" fill="none" stroke="var(--border-soft)" stroke-width="8"/>
+          <circle cx="45" cy="45" r="38" fill="none" stroke="var(--green)" stroke-width="8"
+            stroke-dasharray="238.7" stroke-dashoffset="30" stroke-linecap="round" transform="rotate(-90 45 45)"/>
+        </svg>
+        <div class="gpu-status-text">GPU Engine Status</div>
+        <div class="gpu-status-val">OPERATIONAL</div>
+      </div>
+      <div class="metric-strip">
+        <div class="metric-cell"><div class="lbl">FPS</div><div class="val" id="fpsVal">18</div><div class="sub">Target ≥15</div></div>
+        <div class="metric-cell"><div class="lbl">GPU Temp</div><div class="val" id="tempVal">38°C</div><div class="sub">Nominal</div></div>
+        <div class="metric-cell"><div class="lbl">Memory</div><div class="val" id="memVal">2.3/4.0GB</div><div class="sub" id="memPct">57%</div></div>
+      </div>
+      <button class="restart-btn" id="restartBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4v6h6M20 20v-6h-6"/><path d="M4 10a8 8 0 0114-4.9M20 14a8 8 0 01-14 4.9"/></svg>
+        RESTART TENSORRT ENGINE
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 3: TIMELINE -->
+<section class="screen" id="s3">
+  <div class="screen-title">Historical Timeline</div>
+  <div class="screen-sub">Click any event to inspect its detection detail</div>
+  <div class="grid2">
+    <div class="panel">
+      <h3>Event Timeline</h3>
+      <div class="timeline" id="timelineList"></div>
+
+      <div class="section-gap">
+        <h3>Discard Log &amp; Anomalies</h3>
+        <table class="discard-table">
+          <thead><tr><th>Time</th><th>Frame</th><th>Score</th><th>Class</th><th>Reason</th></tr></thead>
+          <tbody>
+            <tr><td>12:01:05 AM</td><td>FID-022</td><td>0.35</td><td>Unknown</td><td>Confidence &lt; 0.6</td></tr>
+            <tr><td>12:01:12 AM</td><td>FID-031</td><td>0.52</td><td>Smoke</td><td>Confidence &lt; 0.6</td></tr>
+            <tr><td>12:01:25 AM</td><td>FID-045</td><td>N/A</td><td>Invalid ID</td><td>Invalid class output</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Event Inspector <span class="tag" id="inspectorSelTag">Selected item</span></h3>
+      <div class="video-wrap" style="position:relative; margin-bottom:14px;">
+        <svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMid slice">
+          <rect width="400" height="250" fill="#12161f"/>
+          <rect x="0" y="170" width="400" height="80" fill="#181d28"/>
+          <rect x="230" y="60" width="90" height="160" fill="#1c212b"/>
+          <circle cx="255" cy="155" r="16" fill="#ff6a1f" opacity="0.85"/>
+        </svg>
+        <div class="overlay-tag" style="left:14px; top:14px;">RAW_DETECTION</div>
+      </div>
+      <div class="confidence-gauge">
+        <svg width="100" height="100" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border-soft)" stroke-width="8"/>
+          <circle cx="50" cy="50" r="42" fill="none" stroke="var(--accent)" stroke-width="8" id="gaugeArc"
+            stroke-dasharray="264" stroke-dashoffset="30" stroke-linecap="round" transform="rotate(-90 50 50)"/>
+        </svg>
+        <div class="gauge-pct" id="gaugePct" style="margin-top:-70px;">88%</div>
+        <div class="gauge-sub" style="margin-top:24px;">or 0.88</div>
+      </div>
+      <div class="class-tags">
+        <span class="class-tag active" id="classFlame">Flame</span>
+        <span class="class-tag inactive" id="classSmoke">Smoke</span>
+      </div>
+      <div class="section-gap">
+        <div class="detail-row"><span class="k">Detection ID</span><span class="v" id="detId">FDS-003</span></div>
+        <div class="detail-row"><span class="k">Class ID</span><span class="v" id="detClass">1 → Flame</span></div>
+        <div class="detail-row"><span class="k">Frame NMS Processing</span><span class="v">Applied</span></div>
+        <div class="detail-row"><span class="k">Post-Processing Decision</span><span class="v" id="detDecision" style="color:var(--red);">Alarm Activated</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 4: ALARM CONTROL -->
+<section class="screen" id="s4">
+  <div class="screen-title">Active Alarm &amp; Control Center</div>
+  <div class="screen-sub">Emergency response interface — physical hardware state (Jetson Nano) &nbsp;<span style="color:var(--amber); font-weight:600;">⚠ simulated — pending GPIO module feed</span></div>
+  <div class="grid3">
+    <div class="panel">
+      <div class="alarm-icon" style="background:var(--panel-2);">🔈</div>
+      <div class="alarm-status-lbl">AUDIBLE ALARM</div>
+      <div class="alarm-status-sub">PWM Piezo Buzzer</div>
+      <div class="big-status standby" id="buzzerStatus">STANDBY</div>
+      <div class="mini-detail" id="buzzerPwm">PWM: Off</div>
+      <div class="vol-row">
+        <span style="font-size:16px;">🔇</span>
+        <input type="range" id="volSlider" min="0" max="100" value="35" style="flex:1;">
+      </div>
+      <div class="mini-detail" style="margin-top:14px;">AUDIBLE ALARM: PWM Piezo Buzzer<br>External fire suppression interlock</div>
+    </div>
+
+    <div class="panel">
+      <div class="alarm-icon" style="background:var(--red-dim);">💡</div>
+      <div class="alarm-status-lbl">VISUAL ALARM</div>
+      <div class="alarm-status-sub">RGB LED Strip</div>
+      <div class="big-status active" id="ledStatus">ACTIVE<span class="wave">〜</span></div>
+      <div class="mini-detail" id="ledDetail">COLOR: RED / Flashing (UC-005)</div>
+      <div class="leds" id="ledStrip"></div>
+
+      <div class="relay-box">
+        <h3 style="margin-bottom:0;">5V Relay Control</h3>
+        <div class="relay-row">
+          <div class="toggle-switch on" id="relayToggle"></div>
+          <div class="relay-state" id="relayState" style="color:var(--red);">SUPPRESSION<br>SYSTEM ENGAGED</div>
+        </div>
+        <div class="warn-box" id="relayWarn">⚠️&nbsp; Warning: hardware relay failure (UC-005 EX1)</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="sync-card">
+        <div style="display:flex; align-items:center; gap:8px; color:var(--amber); font-weight:700; font-size:13px;">☁️ SYNC PENDING (AC1)</div>
+        <div style="font-size:11.5px; color:var(--text-faint); margin-top:6px;">Events stored locally in SQLite3</div>
+      </div>
+      <button class="ack-btn" id="ackBtn">
+        <span style="font-size:22px;">🔕</span>
+        <span>ACKNOWLEDGE &amp; MUTE ALARMS</span>
+      </button>
+      <div class="mini-detail" style="text-align:center; margin-top:10px;">Acknowledge &amp; mute alarms — logs operator action</div>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 5: EVENT DATABASE -->
+<section class="screen" id="s5">
+  <div class="screen-title">Global Event Database (Logs)</div>
+  <div class="screen-sub">Standard tabular interface for historical data review, exporting logs, and analyzing system uptime</div>
+  <div class="panel">
+    <div class="filter-bar">
+      <div class="field-group">
+        <label>From</label>
+        <input type="date" id="dateFrom" value="2024-05-15">
+      </div>
+      <div class="field-group">
+        <label>To</label>
+        <input type="date" id="dateTo" value="2024-05-18">
+      </div>
+      <div class="field-group">
+        <label>Event Type</label>
+        <select id="typeFilter">
+          <option value="">All Types</option>
+          <option>Threat</option>
+          <option>Failure</option>
+          <option>Switch</option>
+          <option>Normal</option>
+          <option>Relay</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Search</label>
+        <input type="text" id="searchBox" placeholder="Search logs...">
+      </div>
+      <button class="btn primary" id="searchBtn">🔍 Search</button>
+      <button class="btn" id="exportBtn">⬇ Export Logs (CSV)</button>
+    </div>
+
+    <table class="event-table">
+      <thead>
+        <tr>
+          <th data-sort="timestamp">Timestamp ↕</th>
+          <th data-sort="type">Type ↕</th>
+          <th data-sort="confidence">Confidence Score ↕</th>
+          <th data-sort="state">Actuation State ↕</th>
+          <th data-sort="sync">Network Sync Status ↕</th>
+        </tr>
+      </thead>
+      <tbody id="eventTableBody"></tbody>
+    </table>
+    <div class="results-count" id="resultsCount"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+// ---------- Clock ----------
+function updateClock(){
+  const now = new Date();
+  let h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  document.getElementById('clock').textContent =
+    `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} ${ampm}`;
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ---------- Nav ----------
+document.querySelectorAll('#nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#nav button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(btn.dataset.screen).classList.add('active');
+  });
+});
+
+// ---------- Screen 1: threshold slider + radio ----------
+const threshSlider = document.getElementById('threshSlider');
+const threshVal = document.getElementById('threshVal');
+threshSlider.addEventListener('input', ()=>{ threshVal.textContent = parseFloat(threshSlider.value).toFixed(2); });
+
+document.querySelectorAll('#radioGroup input').forEach(r=>{
+  r.addEventListener('change', ()=>{
+    document.querySelectorAll('.radio-opt').forEach(o=>o.classList.remove('checked'));
+    r.closest('.radio-opt').classList.add('checked');
+  });
+});
+
+// simulate live FPS jitter on screen 1 label
+// DATA_SOURCE_PENDING: replace with real FPS once Mihir's inference loop exposes it
+setInterval(()=>{
+  const fps = 16 + Math.floor(Math.random()*4);
+  const el = document.getElementById('liveFps');
+  if(el) el.textContent = fps;
+}, 2000);
+
+// DATA_SOURCE: /api/events -> real detection log (src/utils/db_logger.py)
+async function refreshDetectionLog(){
+  const logList = document.getElementById('logList');
+  try{
+    const res = await fetch('/api/events?limit=6');
+    const events = await res.json();
+    if(!events.length){
+      logList.innerHTML = '<div style="color:var(--text-faint); font-size:12px;">No detections logged yet.</div>';
+      return;
+    }
+    logList.innerHTML = events.map(e=>{
+      const chipClass = e.class_name === 'fire' ? 'flame' : 'smoke';
+      const chipLabel = e.class_name === 'fire' ? 'Flame' : 'Smoke';
+      const d = new Date(e.timestamp);
+      const timeStr = isNaN(d) ? e.timestamp : d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      const pctColor = e.alert_triggered ? 'color:var(--accent);' : '';
+      return `<div class="log-item">
+        <span class="chip ${chipClass}">${chipLabel}</span>
+        <span class="log-time">${timeStr}</span>
+        <span class="log-pct" style="${pctColor}">${Math.round(e.confidence*100)}%</span>
+      </div>`;
+    }).join('');
+  }catch(err){
+    logList.innerHTML = '<div style="color:var(--red); font-size:12px;">Backend unreachable — is Flask running?</div>';
+    console.warn('Detection log fetch failed:', err);
+  }
+}
+refreshDetectionLog();
+setInterval(refreshDetectionLog, 3000);
+
+// ---------- Screen 2: GPU metrics + restart ----------
+setInterval(()=>{
+  const fps = 16 + Math.floor(Math.random()*4);
+  const temp = 36 + Math.floor(Math.random()*5);
+  const memGb = (2.1 + Math.random()*0.4).toFixed(1);
+  document.getElementById('fpsVal').textContent = fps;
+  document.getElementById('tempVal').textContent = temp + '°C';
+  document.getElementById('memVal').textContent = memGb + '/4.0GB';
+  document.getElementById('memPct').textContent = Math.round(memGb/4.0*100) + '%';
+}, 2500);
+
+document.getElementById('restartBtn').addEventListener('click', function(){
+  const btn = this;
+  btn.classList.add('spinning');
+  btn.querySelector('span') && null;
+  btn.lastChild.textContent = ' RESTARTING...';
+  setTimeout(()=>{
+    btn.classList.remove('spinning');
+    btn.lastChild.textContent = ' RESTART TENSORRT ENGINE';
+  }, 1800);
+});
+
+// ---------- Screen 3: Timeline (live) ----------
+// DATA_SOURCE: /api/events -> src/utils/db_logger.py (real detections table)
+let timelineData = [];
+
+function mapEventsToTimeline(events){
+  return events.map(e=>{
+    const d = new Date(e.timestamp);
+    const timeStr = isNaN(d) ? e.timestamp : d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const cls = e.class_name === 'fire' ? 'Flame' : 'Smoke';
+    return {
+      time: timeStr,
+      type: e.alert_triggered ? 'alarm' : 'discard',
+      label: e.alert_triggered ? `${cls.toUpperCase()} ALARM` : 'FRAME DISCARDED',
+      conf: e.confidence,
+      cls: cls,
+      id: 'FDS-' + String(e.id).padStart(3,'0'),
+      decision: e.alert_triggered ? 'Alarm Activated' : 'Below Threshold'
+    };
+  });
+}
+
+async function refreshTimeline(){
+  try{
+    const res = await fetch('/api/events?limit=15');
+    const events = await res.json();
+    timelineData = mapEventsToTimeline(events);
+    if(timelineData.length) renderTimeline(0);
+  }catch(err){
+    console.warn('Timeline fetch failed, backend may not be running yet:', err);
+  }
+}
+
+const tlList = document.getElementById('timelineList');
+function renderTimeline(selectedIdx){
+  if(!timelineData.length){
+    tlList.innerHTML = '<div style="color:var(--text-faint); font-size:12.5px; padding:12px 0;">No detection events logged yet.</div>';
+    return;
+  }
+  tlList.innerHTML = '';
+  timelineData.forEach((item, idx)=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'tl-item';
+    wrap.innerHTML = `
+      <div class="tl-dot ${item.type==='discard'?'discarded':''}"></div>
+      <div class="tl-row ${item.type==='discard'?'discarded':''} ${idx===selectedIdx?'selected':''}">
+        <span class="tl-time">${item.time}</span>
+        <span class="tl-label ${item.type==='discard'?'discard':''}">${item.type==='alarm'?'🔥 ':'✕ '}${item.label}</span>
+      </div>`;
+    wrap.addEventListener('click', ()=> renderTimeline(idx));
+    tlList.appendChild(wrap);
+  });
+  const item = timelineData[selectedIdx];
+  document.getElementById('gaugePct').textContent = Math.round(item.conf*100)+'%';
+  document.getElementById('inspectorSelTag').textContent = item.time;
+  document.getElementById('detId').textContent = item.id;
+  document.getElementById('detClass').textContent = (item.cls==='Flame'?'1 → Flame':'2 → Smoke');
+  document.getElementById('detDecision').textContent = item.decision;
+  document.getElementById('detDecision').style.color = item.decision==='Alarm Activated' ? 'var(--red)' : 'var(--text-dim)';
+  document.getElementById('classFlame').className = 'class-tag ' + (item.cls==='Flame'?'active':'inactive');
+  document.getElementById('classSmoke').className = 'class-tag ' + (item.cls==='Smoke'?'active':'inactive');
+  const circumference = 264;
+  document.getElementById('gaugeArc').setAttribute('stroke-dashoffset', circumference*(1-item.conf));
+}
+refreshTimeline();
+setInterval(refreshTimeline, 5000);
+
+// ---------- Screen 4: Alarm control ----------
+let alarmActive = true;
+function renderLeds(){
+  const strip = document.getElementById('ledStrip');
+  strip.innerHTML = '';
+  for(let i=0;i<18;i++){
+    const led = document.createElement('div');
+    led.className = 'led ' + (alarmActive ? (i%2===0?'on':'on alt') : '');
+    strip.appendChild(led);
+  }
+}
+renderLeds();
+setInterval(()=>{ if(alarmActive) renderLeds(); }, 400);
+
+document.getElementById('ackBtn').addEventListener('click', function(){
+  alarmActive = false;
+  document.getElementById('buzzerStatus').textContent = 'STANDBY';
+  document.getElementById('buzzerStatus').className = 'big-status standby';
+  document.getElementById('ledStatus').innerHTML = 'MUTED';
+  document.getElementById('ledStatus').className = 'big-status standby';
+  document.getElementById('ledDetail').textContent = 'COLOR: — / Idle';
+  document.getElementById('relayToggle').classList.remove('on');
+  document.getElementById('relayState').textContent = 'STANDBY';
+  document.getElementById('relayState').style.color = 'var(--text-dim)';
+  document.getElementById('relayWarn').style.display = 'none';
+  renderLeds();
+  this.classList.add('acked');
+  this.innerHTML = '<span style="font-size:22px;">✓</span><span>ACKNOWLEDGED</span>';
+});
+
+document.getElementById('relayToggle').addEventListener('click', function(){
+  this.classList.toggle('on');
+  const on = this.classList.contains('on');
+  const stateEl = document.getElementById('relayState');
+  stateEl.textContent = on ? 'SUPPRESSION SYSTEM ENGAGED' : 'SUPPRESSION SYSTEM DISENGAGED';
+  stateEl.style.color = on ? 'var(--red)' : 'var(--text-dim)';
+});
+
+// ---------- Screen 5: Event Database (live) ----------
+// DATA_SOURCE: /api/logs -> src/dashboard/app.py -> src/utils/db_logger.py
+let sortKey = 'timestamp', sortDir = 'desc';
+let lastRows = [];
+
+async function renderTable(){
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  const typeF = document.getElementById('typeFilter').value;
+  const search = document.getElementById('searchBox').value;
+
+  const params = new URLSearchParams({sort: sortKey, dir: sortDir});
+  if(from) params.set('from', from);
+  if(to) params.set('to', to);
+  if(typeF) params.set('type', typeF);
+  if(search) params.set('search', search);
+
+  const tbody = document.getElementById('eventTableBody');
+  try{
+    const res = await fetch('/api/logs?' + params.toString());
+    const data = await res.json();
+    lastRows = data.results;
+
+    tbody.innerHTML = lastRows.map(e=>`
+      <tr>
+        <td>${e.timestamp}</td>
+        <td><span class="type-chip ${e.type}">${e.type}</span></td>
+        <td>${e.confidence!==null ? Number(e.confidence).toFixed(2) : 'N/A'}</td>
+        <td>${e.state}</td>
+        <td>${e.sync}</td>
+      </tr>
+    `).join('') || `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-faint);">No events match these filters yet — once detections start logging, they'll show up here.</td></tr>`;
+
+    document.getElementById('resultsCount').textContent = `${data.count} events shown`;
+  }catch(err){
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--red);">Could not reach the backend at /api/logs — is the Flask app running?</td></tr>`;
+    console.warn('Event log fetch failed:', err);
+  }
+  return lastRows;
+}
+
+document.getElementById('searchBtn').addEventListener('click', renderTable);
+document.getElementById('searchBox').addEventListener('keyup', e=>{ if(e.key==='Enter') renderTable(); });
+document.getElementById('dateFrom').addEventListener('change', renderTable);
+document.getElementById('dateTo').addEventListener('change', renderTable);
+document.getElementById('typeFilter').addEventListener('change', renderTable);
+document.querySelectorAll('.event-table th').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.sort;
+    if(sortKey===key) sortDir = (sortDir==='desc'?'asc':'desc'); else { sortKey = key; sortDir = 'desc'; }
+    renderTable();
+  });
+});
+
+document.getElementById('exportBtn').addEventListener('click', async ()=>{
+  const rows = await renderTable();
+  const header = 'Timestamp,Type,Confidence,Actuation State,Network Sync Status\n';
+  const csv = header + rows.map(e=>
+    `${e.timestamp},${e.type},${e.confidence!==null?e.confidence:'N/A'},${e.state},${e.sync}`
+  ).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'neemus_event_logs.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+renderTable();
+setInterval(renderTable, 6000);
+</script>
+</body>
+</html>

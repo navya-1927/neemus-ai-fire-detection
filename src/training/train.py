@@ -14,7 +14,7 @@ import argparse
 from ultralytics import YOLO
 
 
-def train(data_yaml: str, epochs: int, base_model: str):
+def train(data_yaml: str, epochs: int, base_model: str, img_size: int = 416):
     """Train a YOLOv8-Nano model on the fire/smoke dataset.
 
     Args:
@@ -28,7 +28,7 @@ def train(data_yaml: str, epochs: int, base_model: str):
         f"for {epochs} epochs at {img_size}px."
     )
     print("    model = YOLO(base_model)")
-    print("    model.train(data=data_yaml, epochs=epochs)")
+    print("    model.train(data=data_yaml, epochs=epochs, imgsz=img_size)")
 
     # Example real implementation:
     # model = YOLO(base_model)
@@ -41,6 +41,7 @@ if __name__ == "__main__":
     parser.add_argument("--data", default="config/dataset.yaml", help="Path to dataset YAML")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--base-model", default="yolov8n.pt")
+    parser.add_argument("--img-size", type=int, default=416, help="Input image size (proposal: 416)")
     args = parser.parse_args()
 
-    train(args.data, args.epochs, args.base_model)
+    train(args.data, args.epochs, args.base_model, args.img_size)

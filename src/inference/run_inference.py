@@ -16,22 +16,20 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2]))  # repo root
 
 from src.utils.config import load_config
-from src.utils.logger import DetectionLogger
+from src.utils.db_logger import DBLogger
 from src.utils.alarm import AlarmController
-
+from src.utils.alert_manager import AlertManager
+from src.utils.telemetry import TelemetryReporter
+from src.utils.frame_publisher import FramePublisher
+from src.utils.hardware_alarm import make_alarm
 import cv2
 
 
 def load_model(weights_path: str):
-    """Load the detection model (TensorRT engine, ONNX, or .pt depending on stage).
+    """Load the trained YOLO model (.pt for dev machine)."""
+    from ultralytics import YOLO
+    return YOLO(weights_path)
 
-    TODO: implement once model export is ready (Phase 3 — Embedded Deployment).
-    For TensorRT: load .engine via pycuda/tensorrt runtime.
-    For dev-machine testing: can load a .pt via ultralytics YOLO() as a stand-in.
-    """
-    raise NotImplementedError(
-        f"Model loading not yet implemented. Expected weights at: {weights_path}"
-    )
 
 
 def preprocess_frame(frame, input_size: int):
@@ -47,23 +45,31 @@ def run(config_path: str):
 
     cam_cfg = config["camera"]
     model_cfg = config["model"]
+    det_cfg = config["detection"]
     alarm_cfg = config["alarm"]
 
-    logger = DetectionLogger(config["logging"]["db_path"])
+    logger = DBLogger(config["logging"]["db_path"])
     alarm = AlarmController(
         buzzer_pin=alarm_cfg["buzzer_gpio_pin"],
         led_pin=alarm_cfg["led_gpio_pin"],
         relay_pin=alarm_cfg["relay_gpio_pin"],
-        cooldown_seconds=alarm_cfg["trigger_cooldown_seconds"],
+        cooldown_seconds=0,    
     )
+    alert_mgr = AlertManager(
+        db_logger=logger,
+        confidence_threshold=det_cfg["confidence_threshold"],
+        debounce_frames=det_cfg["debounce_frames"],
+        alert_cooldown_seconds=det_cfg["alert_cooldown_seconds"],
+        on_alert=lambda top: alarm.trigger(),
+    )    
 
     cap = cv2.VideoCapture(cam_cfg["source"])
     if not cap.isOpened():
         raise RuntimeError(f"Could not open camera source: {cam_cfg['source']}")
-
+    model = load_model(model_cfg["weights_path"])
+    telemetry = TelemetryReporter()
+    publisher = FramePublisher(config["dashboard"]["live_frame_path"])
     print("Starting inference loop. Press Ctrl+C to stop.")
-    print("NOTE: model loading is not yet implemented — this loop currently "
-          "just exercises capture + preprocessing for pipeline testing.")
 
     try:
         while True:
@@ -72,8 +78,28 @@ def run(config_path: str):
                 print("Frame capture failed, stopping.")
                 break
 
-            _ = preprocess_frame(frame, model_cfg["input_size"])
+            results = model(
+                frame,
+                imgsz=model_cfg["input_size"],
+                conf=det_cfg.get("model_conf_floor", 0.25),
+                verbose=False,
+            )
 
+            detections = [
+                {
+                    "class_name": det_cfg["classes"][int(box.cls)],
+                    "confidence": float(box.conf),
+                    "bbox": box.xyxy[0].tolist(),
+                }
+                for box in results[0].boxes
+            ]
+            alert_mgr.process_frame(detections)
+            annotated = results[0].plot()
+            publisher.publish(annotated)
+            cv2.imshow("NEEMUS Fire Detection (press q to quit)", annotated)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
+            telemetry.tick()
             # TODO once model is ready:
             # detections = model_infer(model, processed_frame)
             # for det in detections:
