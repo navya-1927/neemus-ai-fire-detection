@@ -83,6 +83,7 @@ Wiring diagram: [`hardware/wiring_diagrams/`](hardware/wiring_diagrams/).
 ```
 ai-fire-detection/
 ├── src/
+│   ├── dashboard         # Contains code for a real-time dashboard.
 │   ├── inference/        # Real-time inference pipeline (camera → model → alarm)
 │   ├── training/         # Dataset prep, training, evaluation scripts
 │   └── utils/            # Shared helpers (logging, config loading, GPIO control)
@@ -90,10 +91,14 @@ ai-fire-detection/
 ├── hardware/
 │   ├── firmware/          # ESP32 / GPIO firmware code (if used)
 │   └── wiring_diagrams/   # Circuit & block diagrams
-├── config/                 # YAML/JSON config files (thresholds, camera settings)
-├── scripts/                 # One-off setup / deployment scripts
-├── tests/                   # Unit tests
-├── .github/                 # Issue templates, CI workflows
+├── config/                # YAML/JSON config files (thresholds, camera settings)
+├── scripts/               # One-off setup / deployment scripts
+├── tests/                 # Unit tests
+├── sample_data/           # Contains sample data and output the model was tested on.
+├── .github/               # Issue templates, CI workflows
+├── main.py                # Starter code for the repository
+├── seed_data.py           # Database logger code
+├── start_neemus.bat       # Code to activate dashboard
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -128,8 +133,6 @@ Download and unzip the fire detection and classification datasets from HuggingFa
 ```bash
 python src/inference/run_inference.py --config config/default.yaml
 ```
-
-See [`src/inference/run_inference.py`](src/inference/run_inference.py) for the current stub — this will be filled in as Phase 3 (Embedded Deployment) progresses.
 
 ## Dataset Details
 
@@ -181,7 +184,5 @@ train/test/val split:
 | **Dev Tiwari** | Embedded Hardware & Device Integration — Jetson setup, camera/GPIO, buzzer/LED/relay control, firmware |
 | **Saarang Agarwal** | System Software, Monitoring & Data Management — real-time workflow integration, alerting, logging, dashboard, deployment |
 | **Navya B. Kommuri** | Dataset Engineering, AI Training & Validation — data collection/annotation, augmentation, training, accuracy analysis, threshold tuning |
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch/workflow conventions per module.
 
 ---
