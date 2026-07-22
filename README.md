@@ -2,7 +2,7 @@
 
 An embedded AI system that detects flame and smoke signatures in real time using a lightweight deep learning model (YOLOv8-Nano / MobileNet) running on an NVIDIA Jetson Nano, with automated buzzer/LED/relay alarm integration.
 
-> Built to replace traditional smoke/heat detectors — which have high false-alarm rates and no visual intelligence — with on-device, low-power, low-latency computer vision.
+Built to replace traditional smoke/heat detectors — which have high false-alarm rates and no visual intelligence — with on-device, low-power, low-latency computer vision.
 
 ---
 
@@ -34,12 +34,12 @@ Traditional fire/smoke detectors are reactive, slow in large or outdoor spaces, 
 
 ## Key Features
 
-- 🎯 **Real-time detection** of flame and smoke from live camera feed
-- ⚡ **Edge inference** — no server/cloud round-trip, fully on-device
-- 🔔 **Automated alarm response** — buzzer, LED, and relay trigger on detection
-- 📉 **Optimized model** — INT8 quantized, pruned, exported to TensorRT/ONNX for fast inference on constrained hardware
-- 📊 **Logging & monitoring** — local SQLite logging with optional web dashboard
-- 🔌 **Modular hardware integration** — supports CSI camera, IR sensor, GPIO peripherals, optional ESP32 extension
+- **Real-time detection** of flame and smoke from live camera feed
+- **Edge inference** — no server/cloud round-trip, fully on-device
+- **Automated alarm response** — buzzer, LED, and relay trigger on detection
+- **Optimized model** — INT8 quantized, pruned, exported to TensorRT/ONNX for fast inference on constrained hardware
+- **Logging & monitoring** — local SQLite logging with optional web dashboard
+- **Modular hardware integration** — supports CSI camera, IR sensor, GPIO peripherals, optional ESP32 extension
 
 ## System Architecture
 
@@ -52,8 +52,6 @@ Frame Buffer          Flame/Smoke Model        Trigger Logic            Serial /
 ```
 
 **Inference pipeline:** Frame capture (GStreamer) → Pre-processing (resize 416×416, normalize) → YOLOv8-Nano TensorRT inference → Non-Maximum Suppression → Confidence check (>0.6) → Alarm trigger or loop to next frame.
-
-See [`docs/proposal/`](docs/proposal/) for full architecture diagrams and the original technical proposal.
 
 ## Tech Stack
 
@@ -78,7 +76,7 @@ See [`docs/proposal/`](docs/proposal/) for full architecture diagrams and the or
 - **Power:** 5V/4A power supply
 - **Storage:** MicroSD 64GB or SSD
 
-Full part list and wiring diagram: [`docs/proposal/`](docs/proposal/) and [`hardware/wiring_diagrams/`](hardware/wiring_diagrams/).
+Wiring diagram: [`hardware/wiring_diagrams/`](hardware/wiring_diagrams/).
 
 ## Repository Structure
 
@@ -95,8 +93,6 @@ ai-fire-detection/
 ├── config/                 # YAML/JSON config files (thresholds, camera settings)
 ├── scripts/                 # One-off setup / deployment scripts
 ├── tests/                   # Unit tests
-├── docs/
-│   └── proposal/           # Original technical proposal & supporting docs
 ├── .github/                 # Issue templates, CI workflows
 ├── requirements.txt
 ├── .gitignore
@@ -125,7 +121,7 @@ source venv/bin/activate        # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Download and unzip the dataset from HuggingFace: https://huggingface.co/datasets/navya-1927/neemus-ai-fire-detection-dataset
+Download and unzip the fire detection and classification datasets from HuggingFace: https://huggingface.co/datasets/navya-1927/neemus-ai-fire-detection-dataset
 
 ### Running inference (once a model is trained/placed in `models/`)
 
@@ -137,6 +133,9 @@ See [`src/inference/run_inference.py`](src/inference/run_inference.py) for the c
 
 ## Dataset Details
 
+Two datasets have been used: one for fire detection and one for fire classification.
+
+### Fire Detection Dataset Details:
 Source: https://github.com/gaia-solutions-on-demand/DFireDataset/tree/master <br>
 Number of images:
 - only fire: 1164
@@ -152,20 +151,27 @@ train/test/val split:
 
 <p> the train, val and test folders contain two folders: images and labels. labels contains the normalised bounding box coordinates for each image. 0 stands for smoke and 1 stands for fire. </p>
 
+### Fire Classification Dataset Details
+Source: https://universe.roboflow.com/rutuja-t3xz4/fire-classification-up72t <br>
+Number of images:
+- Chemical: 29 images
+- Electrical: 159 images
+- Explosive: 45 images
+- Cooking Oils/Fats: 230
+- Flammable Liquids: 223
+- Solid Combustibles: 519
+- Flashover: 24 images
+- Hydrocarbon Pool: 80
+- Warehouse: 82 images
+- Wild/Bush Fires: 604 <br>
+total: 1995 <br>
+
+train/test/val split:
+- train: 1396 (70%)
+- val: 200 (10%)
+- test: 399 (20%) <br>
+
 <p> YOLO augments images before training by default. </p>
-
-## Project Roadmap
-
-| Phase | Weeks | Milestone |
-|---|---|---|
-| 1 | 1–2 | Literature review, dataset collection & labeling, hardware setup |
-| 2 | 3–6 | Train baseline CNN/YOLO model, evaluate, optimize (quantization & pruning) |
-| 3 | 7–8 | Port model to edge runtime, integrate camera pipeline, hit ≥15 FPS |
-| 4 | 9–11 | Wire GPIO alarms (buzzer, LED, relay), test end-to-end flow |
-| 5 | 12–14 | Real-world fire/smoke testing, false-positive tuning, latency optimization |
-| 6 | 15–16 | Final prototype, demo, and documentation |
-
-Track active work in [Issues](../../issues) and [Projects](../../projects).
 
 ## Team & Module Ownership
 
@@ -178,15 +184,4 @@ Track active work in [Issues](../../issues) and [Projects](../../projects).
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for branch/workflow conventions per module.
 
-## Documentation
-
-- 📄 [Technical Proposal (original PDF, converted)](docs/proposal/) — full problem statement, objectives, architecture, and team experience
-- 📄 [Work Assignment](docs/proposal/) — module breakdown per team member
-
-## Status
-
-🚧 **Early development — Phase 1.** Repository scaffolding in progress; no trained model yet.
-
 ---
-
-*Internal project — no license applied yet. Do not distribute outside the team until a license is added.*
