@@ -59,8 +59,8 @@ def output(pin, state):
     if state == HIGH:
         print(f"\n[HARDWARE TRIGGER] Sending {status} signal to Pin {pin}")
         print("   -> Simulated Relay: ENGAGED")
-    else:
-        print(f"[HARDWARE TRIGGER] Sending {status} signal to Pin {pin} (System Normal)")
+    #else:
+        #print(f"[HARDWARE TRIGGER] Sending {status} signal to Pin {pin} (System Normal)")
 
 def cleanup():
     global _current_mode

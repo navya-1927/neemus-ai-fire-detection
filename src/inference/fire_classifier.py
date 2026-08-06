@@ -3,7 +3,7 @@ import cv2
 from ultralytics import YOLO
 
 class FireClassifierEngine:
-    def __init__(self, model_path="best_classifier.pt"):
+    def __init__(self, model_path="models/fire_classification/classifier.pt"):
         """
         Initializes the classification model.
         Make sure 'model_path' points to your trained classification weights.

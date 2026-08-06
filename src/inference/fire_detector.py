@@ -2,7 +2,7 @@
 from ultralytics import YOLO
 
 class YoloInferenceEngine:
-    def __init__(self, model_path="best.pt"):
+    def __init__(self, model_path="models/fire_detection/best.pt"):
         print(f"[AI] Loading YOLOv8 Model from {model_path}...")
         self.model = YOLO(model_path, task="detect") 
         self.confidence_threshold = 0.2

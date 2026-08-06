@@ -10,12 +10,12 @@ from fire_classifier import FireClassifierEngine
 import hardware_controller
 
 camera_url = "https://10.11.158.246:8080/video"
-video1 = "fire_video.mp4"
-video2 = "fire_vid2.mp4"
-video3 = "fire_vid3.mp4"
-video4 = "fire_vid4.mp4"
-e_fire = "e_fire.mp4"
-oil_fire = "oil_fire.mp4"
+video1 = "sample_data/fire_video.mp4"
+video2 = "sample_data/fire_vid2.mp4"
+video3 = "sample_data/fire_vid3.mp4"
+video4 = "sample_data/fire_vid4.mp4"
+e_fire = "sample_data/e_fire.mp4"
+oil_fire = "sample_data/oil_fire.mp4"
 confidence = 0.2
 
 def main():
@@ -25,7 +25,7 @@ def main():
     camera = SensorCamera(source=video2)#0 for laptop cam, url for phone cam
 
     detector = YoloInferenceEngine()
-    classifier = FireClassifierEngine(model_path="classifier.pt")
+    classifier = FireClassifierEngine()
     hardware_controller.initialize_hardware()
 
     # Create a tracker to hold frame timestamps for the moving average
@@ -50,7 +50,7 @@ def main():
     # Parameters: filename, codec, FPS (e.g., 15.0), and (width, height)
     #out_video = cv2.VideoWriter('demo_output.mp4', fourcc, 30.0, (width, height))
 
-    out_video = ThreadedVideoWriter('demo_output.mp4', fourcc, 15.0, (width, height))
+    out_video = ThreadedVideoWriter('sample_data/demo_output.mp4', fourcc, 15.0, (width, height))
     # --------------------------
 
 

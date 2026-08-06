@@ -9,7 +9,7 @@ def initialize_hardware():
     GPIO.setup(ALARM_PIN, GPIO.OUT)
     print("[HARDWARE] System initialized and ready.")
 
-def trigger_fire_protocol():
+def trigger_alarms():
     """Turns on the alarms. Mihir calls this when he sees fire."""
     GPIO.output(ALARM_PIN, GPIO.HIGH)
 
