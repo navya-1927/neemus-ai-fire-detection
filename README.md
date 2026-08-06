@@ -96,7 +96,6 @@ ai-fire-detection/
 ├── tests/                 # Unit tests
 ├── sample_data/           # Contains sample data and output the model was tested on.
 ├── .github/               # Issue templates, CI workflows
-├── main.py                # Starter code for the repository
 ├── seed_data.py           # Database logger code
 ├── start_neemus.bat       # Code to activate dashboard
 ├── requirements.txt
@@ -111,12 +110,15 @@ ai-fire-detection/
 - Python 3.8+
 - (On Jetson) CUDA-enabled OpenCV and TensorRT pre-installed via JetPack
 
-### Setup
+### Setup & Installation
 
+Follow these steps to configure your local environment and run the hardware simulation and inference pipeline.
+
+First, download the project to your local machine and enter the directory:
 ```bash
-# Clone the repo
-git clone https://github.com/<your-username>/ai-fire-detection.git
-cd ai-fire-detection
+# Clone the Repository
+git clone [https://github.com/navya-1927/neemus-ai-fire-detection.git](https://github.com/navya-1927/neemus-ai-fire-detection.git)
+cd neemus-ai-fire-detection
 
 # Create a virtual environment
 python3 -m venv venv
