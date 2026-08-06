@@ -117,7 +117,7 @@ Follow these steps to configure your local environment and run the hardware simu
 First, download the project to your local machine and enter the directory:
 ```bash
 # Clone the Repository
-git clone [https://github.com/navya-1927/neemus-ai-fire-detection.git](https://github.com/navya-1927/neemus-ai-fire-detection.git)
+git clone https://github.com/navya-1927/neemus-ai-fire-detection.git
 cd neemus-ai-fire-detection
 
 # Create a virtual environment
